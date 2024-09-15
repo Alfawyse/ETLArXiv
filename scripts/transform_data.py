@@ -63,7 +63,7 @@ def transform_data():
     pd.set_option('display.max_columns', None)
     print(all_articles.head())
 
-    all_articles.to_csv('arxiv_articles.csv', index=False)
+    all_articles.to_csv('./data/arxiv_articles.csv', index=False)
 
 
 # Ejecutar la transformación
