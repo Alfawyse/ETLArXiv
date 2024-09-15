@@ -26,24 +26,31 @@ def save_xml(data, filename):
 async def extract_and_save_data(queries, total_results=300, max_results_per_query=100):
     async with aiohttp.ClientSession() as session:
         for query in queries:
-            accumulated_data = ""  # Variable para acumular los datos
+            accumulated_data = ""
             results_to_fetch = total_results
             start = 0
+
             while results_to_fetch > 0:
-                # Obtener resultados con el límite de max_results por consulta
                 results_to_get = min(max_results_per_query, results_to_fetch)
                 xml_data = await fetch_data(session, query, start, results_to_get)
 
-                # Acumular los resultados
-                accumulated_data += xml_data
+                # Si es la primera parte, incluir la cabecera y abrir el feed
+                if start == 0:
+                    accumulated_data = xml_data.split("</feed>")[0]  # Obtener todo antes de la etiqueta de cierre
+                else:
+                    # Si no es la primera parte, eliminar la cabecera y etiqueta <feed> y solo añadir el contenido
+                    accumulated_data += xml_data.split("<feed")[1].split("</feed>")[0]
 
-                # Actualizar los contadores para la paginación
                 results_to_fetch -= results_to_get
                 start += results_to_get
+
+            # Finalmente, añadir la etiqueta de cierre </feed> una vez al final
+            accumulated_data += "</feed>"
 
             # Guardar el archivo acumulado
             filename = f"results_{query.replace(' ', '_')}.xml"
             save_xml(accumulated_data, filename)
+
 
 
 # Main
