@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import os
 import psycopg2
 
-load_dotenv()  # Cargar variables de entorno desde .env
+load_dotenv()
 
 DATABASE = {
     'dbname': os.getenv('DB_NAME'),
@@ -14,6 +14,13 @@ DATABASE = {
 }
 
 def connect_db():
+    """
+    Establishes a connection to the PostgreSQL database using credentials
+    provided via environment variables.
+
+    Returns:
+        conn (psycopg2.connection): A connection object to interact with the PostgreSQL database.
+    """
     conn = psycopg2.connect(
         dbname=DATABASE['dbname'],
         user=DATABASE['user'],
