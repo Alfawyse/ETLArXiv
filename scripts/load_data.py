@@ -1,9 +1,16 @@
 import pandas as pd
 import psycopg2
-from config.settings import DATABASE  # Importar las credenciales de settings.py
+from config.settings import DATABASE  # Import database credentials from settings.py
 
-# Función para conectarse a la base de datos
+
 def connect_db():
+    """
+    Establishes a connection to the PostgreSQL database using the credentials
+    defined in settings.py.
+
+    Returns:
+        psycopg2.connection: A connection object to interact with the PostgreSQL database.
+    """
     try:
         conn = psycopg2.connect(
             dbname=DATABASE['dbname'],
@@ -14,22 +21,29 @@ def connect_db():
         )
         return conn
     except Exception as error:
-        print(f"Error al conectar a la base de datos: {error}")
+        print(f"Error connecting to the database: {error}")
         return None
 
-# Función para insertar los artículos y sus relaciones
+
 def insert_article_and_associations(article_data):
+    """
+    Inserts an article and its associated data (authors, categories, institutions)
+    into the database.
+
+    Args:
+        article_data (dict): A dictionary containing article information.
+    """
     conn = connect_db()
     cursor = conn.cursor()
     print(article_data)
 
     try:
-        # Verificar si el artículo ya existe
+        # Check if the article already exists
         cursor.execute('SELECT id FROM "ArXiv"."research_articles" WHERE arxiv_id = %s', (article_data['arxiv_id'],))
         article_id = cursor.fetchone()
 
         if article_id is None:
-            # Insertar el artículo
+            # Insert the article
             cursor.execute(
                 """
                 INSERT INTO "ArXiv"."research_articles" (arxiv_id, title, summary, published, updated, html_url, pdf_url)
@@ -45,18 +59,18 @@ def insert_article_and_associations(article_data):
         else:
             article_id = article_id[0]
 
-        # Dividir autores, afiliaciones y países
+        # Split authors, affiliations, and countries
         author_names = article_data['authors'].split(', ')
         author_affiliations = article_data['affiliations'].split(', ') if pd.notna(article_data['affiliations']) else []
         author_countries = article_data['countries'].split(', ') if pd.notna(article_data['countries']) else []
 
-        # Insertar autores y la asociación artículo-autor
+        # Insert authors and article-author associations
         for i, author_name in enumerate(author_names):
             cursor.execute('SELECT id FROM "ArXiv"."research_authors" WHERE name = %s', (author_name,))
             author_id = cursor.fetchone()
 
             if author_id is None:
-                # Insertar el autor
+                # Insert author
                 cursor.execute(
                     'INSERT INTO "ArXiv"."research_authors" (name) VALUES (%s) RETURNING id',
                     (author_name,)
@@ -65,13 +79,13 @@ def insert_article_and_associations(article_data):
             else:
                 author_id = author_id[0]
 
-            # Relacionar artículo con autor
+            # Associate article with author
             cursor.execute(
                 'INSERT INTO "ArXiv"."article_author_associations" (article_id, author_id) VALUES (%s, %s)',
                 (article_id, author_id)
             )
 
-            # Relacionar autor con las categorías adicionales (author_category_associations)
+            # Associate author with additional categories (author_category_associations)
             if pd.notna(article_data['primary_category']) and article_data['categories'] != '':
                 for category_code in article_data['primary_category'].split(', '):
                     cursor.execute('SELECT id FROM "ArXiv"."research_subcategories" WHERE category_code = %s', (category_code,))
@@ -80,20 +94,20 @@ def insert_article_and_associations(article_data):
                     if category_id is not None:
                         category_id = category_id[0]
 
-                        # Relacionar autor con la categoría
+                        # Associate author with the category
                         cursor.execute(
                             'INSERT INTO "ArXiv"."author_category_associations" (author_id, category_id) VALUES (%s, %s)',
                             (author_id, category_id)
                         )
 
-            # Asignar afiliación e institución por autor si están presentes
+            # Assign affiliation and institution to each author if present
             if i < len(author_affiliations):
                 affiliation = author_affiliations[i].strip()
                 cursor.execute('SELECT id FROM "ArXiv"."research_institutions" WHERE name = %s', (affiliation,))
                 institution_id = cursor.fetchone()
 
                 if institution_id is None:
-                    # Insertar la institución
+                    # Insert institution
                     cursor.execute(
                         'INSERT INTO "ArXiv"."research_institutions" (name) VALUES (%s) RETURNING id',
                         (affiliation,)
@@ -102,13 +116,13 @@ def insert_article_and_associations(article_data):
                 else:
                     institution_id = institution_id[0]
 
-                # Relacionar autor con institución
+                # Associate author with institution
                 cursor.execute(
                     'INSERT INTO "ArXiv"."author_institution_associations" (author_id, institution_id) VALUES (%s, %s)',
                     (author_id, institution_id)
                 )
 
-        # Insertar categorías adicionales y asociaciones, asegurando que las categorías no estén vacías
+        # Insert additional categories and associations, ensuring non-empty categories
         if pd.notna(article_data['primary_category']) and article_data['categories'] != '':
             for category_code in article_data['primary_category'].split(', '):
                 cursor.execute('SELECT id FROM "ArXiv"."research_subcategories" WHERE category_code = %s', (category_code,))
@@ -117,35 +131,42 @@ def insert_article_and_associations(article_data):
                 if category_id is not None:
                     category_id = category_id[0]
 
-                    # Relacionar artículo con la categoría
+                    # Associate article with category
                     cursor.execute(
                         'INSERT INTO "ArXiv"."article_category_associations" (article_id, category_id) VALUES (%s, %s)',
                         (article_id, category_id)
                     )
 
-        conn.commit()  # Confirmar los cambios
+        conn.commit()  # Commit changes
     except Exception as error:
-        print(f"Error al insertar el artículo: {error}")
+        print(f"Error inserting article: {error}")
         conn.rollback()
     finally:
         cursor.close()
         conn.close()
 
-# Función para cargar los datos desde el DataFrame
+
 def load_data_to_db(dataframe):
-    # Eliminar espacios en blanco de los nombres de las columnas
+    """
+    Loads data from a DataFrame and inserts it into the database.
+
+    Args:
+        dataframe (pd.DataFrame): The DataFrame containing the article data.
+    """
     dataframe.columns = dataframe.columns.str.strip()
 
     for i, row in dataframe.iterrows():
-        insert_article_and_associations(roww)
+        insert_article_and_associations(row)
 
-# Función principal para cargar los datos
+
 def main():
-    # Cargar el DataFrame desde el archivo CSV
-    dataframe = pd.read_csv('../data/arxiv_articles.csv')  # Cambia la ruta si es necesario
+    """
+    Main function to load article data from a CSV file and insert it into the database.
+    """
+    dataframe = pd.read_csv('../data/arxiv_articles.csv')  # Change path if necessary
 
-    # Cargar los datos en la base de datos
     load_data_to_db(dataframe)
+
 
 if __name__ == "__main__":
     main()
