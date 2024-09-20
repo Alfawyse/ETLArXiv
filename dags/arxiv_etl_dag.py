@@ -1,7 +1,7 @@
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 from airflow.utils.dates import days_ago
-import os
+
 
 default_args = {
     'owner': 'Edward',
@@ -22,22 +22,23 @@ with DAG(
 
     extract_task = BashOperator(
         task_id='extract_data',
-        bash_command='python3 /path/to/scripts/extract_data.py'
+        bash_command='python3 /ETLArXiv/scripts/extract_data.py'
     )
 
     transform_task = BashOperator(
         task_id='transform_data',
-        bash_command='python3 /path/to/scripts/transform_data.py'
+        bash_command='python3 /ETLArXiv/scripts/transform_data.py'
     )
 
-    load_task = BashOperator(
-        task_id='load_data',
-        bash_command='python3 /path/to/scripts/load_data.py'
-    )
+    # Comentar la tarea de load
+    # load_task = BashOperator(
+    #    task_id='load_data',
+    #    bash_command='python3 /ETLArXiv/scripts/load_data.py'
+    # )
 
     upload_task = BashOperator(
         task_id='upload_to_s3',
-        bash_command='python3 /path/to/scripts/upload_to_s3.py'
+        bash_command='python3 /ETLArXiv/scripts/upload_to_s3.py'
     )
 
-    extract_task >> transform_task >> load_task >> upload_task
+    extract_task >> transform_task >> upload_task
